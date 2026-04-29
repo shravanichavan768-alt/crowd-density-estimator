@@ -1,0 +1,12 @@
+# Data (too large for GitHub)
+data/
+models/*.pth
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+
+# VS Code
+.vscode/
