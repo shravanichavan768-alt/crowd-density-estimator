@@ -276,18 +276,35 @@ if uploaded_file is not None:
     gray = np.array(image.convert("L"))
     h, w = gray.shape
 
-    # Simulated density 
-    simulated_points = []
-    threshold = 100
-    step = 15
-    for y in range(0, h, step):
-        for x in range(0, w, step):
-            if gray[y][x] < threshold:
-                simulated_points.append([x, y])
+    # Real CSRNet model inference
+    import torch
+    import torchvision.transforms as transforms
+    from model import CSRNet
 
-    simulated_points = np.array(simulated_points) if simulated_points else np.zeros((1, 2))
-    density = generate_density_map((h, w), simulated_points, sigma=sigma)
+    @st.cache_resource
+    def load_model():
+        device = torch.device('cpu')
+        model = CSRNet(load_weights=False)
+        model.load_state_dict(torch.load('models/csrnet_best.pth', map_location=device))
+        model.eval()
+        return model, device
 
+    model_csrnet, device = load_model()
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    img_tensor = transform(image).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        output = model_csrnet(img_tensor)
+
+    density = output.squeeze().cpu().numpy()
+    density = cv2.resize(density, (w, h))
+    density = np.maximum(density, 0)
+    
     # Heatmap overlay
     density_norm = density / (density.max() + 1e-8)
     heatmap = cm.jet(density_norm)[:, :, :3]
@@ -299,7 +316,11 @@ if uploaded_file is not None:
     overlay_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
 
     total_count = int(get_count_from_density(density))
-    alerts = get_all_zone_alerts(density, grid=(3, 3))
+    total_area_m2 = 1000.0
+    zone_area_m2 = total_area_m2 / 9
+
+    alerts = get_all_zone_alerts(density, grid=(3, 3), zone_area=zone_area_m2)
+
     overall = get_overall_risk(alerts)
 
     # Alert banner

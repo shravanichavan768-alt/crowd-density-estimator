@@ -39,21 +39,18 @@ def get_zone_status(zone_count, zone_area_m2=10.0):
     else:
         return density, "CRITICAL", "red"
 
-def get_all_zone_alerts(density_map, grid=(3, 3)):
-    
+def get_all_zone_alerts(density_map, grid=(3, 3), zone_area=10.0):
     zone_counts = split_into_zones(density_map, grid)
     alerts = []
-
     for i, count in enumerate(zone_counts):
-        density, status, color = get_zone_status(count)
+        density, status, color = get_zone_status(count, zone_area_m2=zone_area)
         alerts.append({
             "zone": f"Zone {i+1}",
             "count": int(count),
-            "density": round(density, 1),
+            "density": round(float(density), 1) if float(density) < 10 else int(round(float(density))),
             "status": status,
             "color": color
         })
-
     return alerts
 
 def get_overall_risk(alerts):
